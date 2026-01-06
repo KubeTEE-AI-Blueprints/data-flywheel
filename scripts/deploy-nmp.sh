@@ -15,7 +15,7 @@ NAMESPACE="default"
 REQUIRED_DISK_GB=200
 REQUIRED_GPUS=2
 NGC_API_KEY="${NGC_API_KEY:-}"
-HELM_CHART_URL="https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nemo-microservices-helm-chart-25.8.0.tgz"
+HELM_CHART_URL="https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nemo-microservices-helm-chart-25.11.0.tgz"
 ADDITIONAL_VALUES_FILES=(demo-values.yaml)
 
 # === Progress Bar Config ===
@@ -159,24 +159,6 @@ install_dependency() {
       rm -rf helm.tar.gz linux-amd64
       ;;
 
-    huggingface-cli)
-      log "Installing huggingface_hub via pip..."
-      if command -v pip3 >/dev/null 2>&1; then
-        pip3 install --user --upgrade huggingface_hub
-      elif command -v pip >/dev/null 2>&1; then
-        pip install --user --upgrade huggingface_hub
-      else
-        # Try to install pip first
-        log "pip not found, attempting to install python3-pip..."
-        maybe_sudo apt-get update && maybe_sudo apt-get install -y python3-pip
-        pip3 install --user --upgrade huggingface_hub
-      fi
-
-      # Add ~/.local/bin to PATH immediately after installation
-      export PATH="$HOME/.local/bin:$PATH"
-      log "Added $HOME/.local/bin to PATH"
-      ;;
-
     jq)
       log "Installing jq..."
       maybe_sudo apt-get update && maybe_sudo apt-get install -y jq || {
@@ -239,7 +221,6 @@ Requirements:
   - Docker v27.0.0 or higher
   - kubectl
   - helm
-  - huggingface-cli
   - jq
   - yq
 
@@ -441,20 +422,6 @@ check_prereqs() {
     die "Could not determine helm version"
   fi
 
-  # Check huggingface-cli
-  if ! command -v huggingface-cli >/dev/null; then
-    # Check in ~/.local/bin explicitly as a fallback
-    if [[ -x "$HOME/.local/bin/huggingface-cli" ]]; then
-      log "huggingface-cli found in $HOME/.local/bin, adding to PATH"
-      export PATH="$HOME/.local/bin:$PATH"
-    else
-      warn "huggingface-cli is required but not found. Attempting to install..."
-      if ! install_dependency "huggingface-cli"; then
-        die "Please install huggingface-cli manually and try again"
-      fi
-    fi
-  fi
-
   log "All prerequisites are met."
 }
 
@@ -540,7 +507,7 @@ download_helm_chart() {
 
   # Clean up any existing chart files/directories
   log "Cleaning up any existing chart files..."
-  rm -rf nemo-microservices-helm-chart-25.7.0.tgz nemo-microservices-helm-chart/
+  rm -rf nemo-microservices-helm-chart-25.11.0.tgz nemo-microservices-helm-chart/
 
   # Check if demo-values.yaml exists, create if missing
   if [[ ! -f "demo-values.yaml" ]]; then
@@ -575,9 +542,12 @@ customizer:
         enabled: true
       meta/llama-3.1-8b-instruct@2.0:
         enabled: true
+      nvidia/nemotron-nano-llama-3.1-8b@1.0:
+        enabled: true
   customizerConfig:
     training:
       pvc:
+        size: 200Gi
         storageClass: "standard"
         volumeAccessMode: "ReadWriteOnce"
 
@@ -823,7 +793,7 @@ main() {
   # Initialize progress bar if enabled
   if [[ "$SHOW_PROGRESS_BAR" == "true" ]]; then
     progress_log "Starting NeMo Microservices deployment..."
-    progress_log "Detailed logs will be written to: /tmp/nemo-deploy.log"
+    progress_log "Please check detailed logs at /tmp/nemo-deploy.log in case of deployement failures"
     echo ""
     # Clear the log file
     > /tmp/nemo-deploy.log
